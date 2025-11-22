@@ -2,6 +2,19 @@
 
 Secure Pay is a hardened Flask application that delivers MFA-protected account access, internal fund transfers, and an auditable transaction history. The app is designed for instructional use and showcases layered defenses such as Argon2 password hashing, encrypted TOTP seeds, RBAC, CSRF protection, and strict security headers.
 
+## Operational Readiness Notice
+
+Secure Pay is an instructional reference implementation showcasing layered security patterns (MFA, RBAC, session governance, hardened headers). While care has been taken to apply industry best practices, it has not undergone formal penetration testing, third‑party code audit, or compliance validation. Treat this codebase as a learning and demo asset.
+
+Before any production deployment you must:
+- Perform a full security review (threat modeling, dependency audit, dynamic/penetration testing).
+- Replace SQLite with a hardened, encrypted production database.
+- Centralize secrets (no .env files) and enable monitored secret rotation.
+- Enforce TLS everywhere and add monitoring/alerting for auth events.
+- Apply continuous patch management (Dependabot / CodeQL / SBOM scanning).
+
+Using the repository “as is” for real financial transactions is not advised until these steps are completed. This notice does not reflect negatively on the quality of the implementation; it clarifies scope and encourages responsible adoption.
+
 ## Features
 
 - User onboarding with password-policy enforcement and automatic account provisioning.
