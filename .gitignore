@@ -1,41 +1,185 @@
-# Python environments
-.venv/
-venv/
 env/
-
-# Python cache / compiled
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[codz]
+*$py.class
 
-# Application instance data
-instance/
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+coverage/
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+logs/
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
 secure_pay.db
 *.sqlite
 
-# Environment variables / secrets
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+# .python-version
+
+# pipenv
+#Pipfile.lock
+
+# UV
+#uv.lock
+
+# poetry
+#poetry.lock
+#poetry.toml
+
+# pdm
+#pdm.lock
+#pdm.toml
+.pdm-python
+.pdm-build/
+
+# pixi
+#pixi.lock
+.pixi
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
 .env
 .env.*
+.envrc
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
 
-# Logs and reports
-logs/
-*.log
-coverage/
-htmlcov/
+# Spyder project settings
+.spyderproject
+.spyproject
 
-# Build artifacts
-build/
-dist/
-*.egg-info/
+# Rope project settings
+.ropeproject
 
-# Tooling caches
+# mkdocs documentation
+/site
+
+# mypy
 .mypy_cache/
-.pytest_cache/
+.dmypy.json
+dmypy.json
 
-# IDE / editor settings
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# IDE / Editor settings
 .vscode/
 .idea/
+
+# JetBrains optional
+#.idea/
+
+# Abstra
+.abstra/
+
+# Visual Studio Code global ignores available separately
+# .vscode/
+
+# Ruff
+.ruff_cache/
+
+# PyPI config
+.pypirc
+
+# Cursor
+.cursorignore
+.cursorindexingignore
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
 
 # Project-specific directories
 .github/
