@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Secure Pay{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/styles.css') }}"
+    />
+  </head>
+  <body>
+    <header>
+      <nav class="top-nav">
+        <div class="nav-left">
+          <div class="brand">
+            Secure Pay
+            <span class="brand-tagline">Digital vault</span>
+          </div>
+          <div class="nav-status">
+            <span class="status-dot"></span>
+            <span>Systems stable</span>
+          </div>
+        </div>
+        <ul>
+          {% if current_user.is_authenticated %}
+          <li><a href="{{ url_for('portal.dashboard') }}">Dashboard</a></li>
+          <li><a href="{{ url_for('portal.transfer') }}">Transfer</a></li>
+          <li>
+            <a href="{{ url_for('portal.beneficiaries') }}">Beneficiaries</a>
+          </li>
+          <li><a href="{{ url_for('portal.devices') }}">Devices</a></li>
+          <li><a href="{{ url_for('portal.transactions') }}">History</a></li>
+          <li>
+            <a href="{{ url_for('portal.password_settings') }}">Security</a>
+          </li>
+          {% if current_user.has_role('admin') %}
+          <li><a href="{{ url_for('portal.admin_panel') }}">Admin</a></li>
+          {% endif %}
+          <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
+          {% else %}
+          <li><a href="{{ url_for('auth.login') }}">Login</a></li>
+          <li><a href="{{ url_for('auth.register') }}">Register</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </header>
+    <main>
+      {% with messages = get_flashed_messages(with_categories=true) %} {% if
+      messages %}
+      <section class="flash-container" aria-live="polite">
+        {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      </section>
+      {% endif %} {% endwith %} {% block content %}{% endblock %}
+    </main>
+    <footer>
+      <p>Secure Pay · Multi-layer security for financial workflows.</p>
+    </footer>
+  </body>
+</html>

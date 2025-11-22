@@ -1,0 +1,46 @@
+{% extends 'base.html' %} {% block title %}Active Devices · Secure Pay{%
+endblock %} {% block content %}
+<section class="card">
+  <h1>Active Sessions</h1>
+  <p class="muted">
+    Terminate devices you do not recognize to protect your account.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Device</th>
+        <th>IP</th>
+        <th>Last Seen</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td>{{ s.user_agent or 'Unknown' }}</td>
+        <td>{{ s.ip_address }}</td>
+        <td>
+          {{ s.last_seen.strftime('%Y-%m-%d %H:%M') if s.last_seen else '—' }}
+        </td>
+        <td>{{ 'Active' if s.is_active else 'Closed' }}</td>
+        <td>
+          {% if s.is_active %}
+          <form method="post">
+            {{ form.csrf_token }} {{ form.session_id(value=s.id) }} {{
+            form.submit(class='btn danger small') }}
+          </form>
+          {% else %}
+          <span class="muted">Ended</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5">No sessions to display.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

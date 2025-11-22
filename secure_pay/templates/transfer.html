@@ -1,0 +1,56 @@
+{% extends 'base.html' %} {% block title %}Transfer Funds · Secure Pay{%
+endblock %} {% block content %}
+<section class="card">
+  <h1>Initiate Transfer</h1>
+  <p>
+    <strong>Available balance:</strong> ${{ '%.2f'|format(account.balance) }}
+  </p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label
+      >{{ form.target_account.label }} {{ form.target_account(class='input')
+      }}</label
+    >
+    {% for error in form.target_account.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %}
+
+    <label>{{ form.amount.label }} {{ form.amount(class='input') }}</label>
+    {% for error in form.amount.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %}
+
+    <label
+      >{{ form.description.label }} {{ form.description(class='input') }}</label
+    >
+    {% for error in form.description.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %} {{ form.submit(class='btn primary') }}
+  </form>
+  <p class="muted">
+    Need shortcuts? Maintain recipients under
+    <a href="{{ url_for('portal.beneficiaries') }}">Beneficiaries</a>.
+  </p>
+</section>
+
+{% if beneficiaries %}
+<section class="card">
+  <h2>Saved Recipients</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Account</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in beneficiaries %}
+      <tr>
+        <td>{{ b.nickname }}</td>
+        <td>{{ b.account_number }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %} {% endblock %}

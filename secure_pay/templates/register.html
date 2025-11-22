@@ -1,0 +1,33 @@
+{% extends 'base.html' %} {% block title %}Register · Secure Pay{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Create a Secure Pay account</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label
+      >{{ form.full_name.label }} {{ form.full_name(class='input') }}</label
+    >
+    {% for error in form.full_name.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %}
+
+    <label>{{ form.email.label }} {{ form.email(class='input') }}</label>
+    {% for error in form.email.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %}
+
+    <label>{{ form.password.label }} {{ form.password(class='input') }}</label>
+    {% for error in form.password.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %}
+
+    <label
+      >{{ form.confirm_password.label }} {{ form.confirm_password(class='input')
+      }}</label
+    >
+    {% for error in form.confirm_password.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %} {{ form.submit(class='btn primary') }}
+  </form>
+</section>
+{% endblock %}

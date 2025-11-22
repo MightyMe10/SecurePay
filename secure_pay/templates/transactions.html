@@ -1,0 +1,32 @@
+{% extends 'base.html' %} {% block title %}Transactions · Secure Pay{% endblock
+%} {% block content %}
+<section class="card">
+  <h1>Transaction History</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Direction</th>
+        <th>Counterparty</th>
+        <th>Amount</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for txn in transactions %}
+      <tr>
+        <td>{{ txn.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ txn.direction|capitalize }}</td>
+        <td>{{ txn.counterparty_account }}</td>
+        <td>${{ '%.2f'|format(txn.amount) }}</td>
+        <td>{{ txn.description }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5">No transactions yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

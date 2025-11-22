@@ -1,0 +1,364 @@
+PROJECT OVERVIEW
+================
+
+Secure Pay is a Flask + SQLAlchemy powered demonstration banking portal implementing layered security controls: strong password policy (Argon2id), encrypted TOTP-based MFA, hardened session management with server-side ActiveSession tracking, RBAC for administrator actions, beneficiary & transfer workflows, and defense-in-depth headers (CSP, frame denial, etc.). It aims to show how to build a minimal financial workflow engine that remains resilient against common web threats (credential stuffing, brute-force, session hijacking, CSRF, weak password practices, replay of MFA tokens).
+
+The application surface includes:
+- User onboarding with MFA secret provisioning.
+- Authenticated dashboard summarizing account and recent transactions.
+- Fund transfer between internal accounts with dual-sided transaction recording.
+- Beneficiary CRUD for saved recipients.
+- Device/session inventory with remote termination.
+- Password reset (requires current password + MFA)
+- Admin console for freezing/reactivating users and issuing temporary passwords.
+
+==================================================================
+1. FUNCTIONAL REQUIREMENTS
+==================================================================
+
+Authentication & Identity
+- User Registration: Create account with email, full name, strong password, auto-generated TOTP secret.
+- User Login: Email + password + 6‑digit TOTP code; optional remember-me.
+- Account Lockout: After MAX_LOGIN_ATTEMPTS within ACCOUNT_LOCK_WINDOW a temporary lock is enforced.
+- Frozen Accounts: Admin can freeze; frozen users cannot log in.
+- Password Update: Authenticated user can reset password (current password + valid TOTP).
+- Admin Password Reset: Admin generates a temporary strong password for any user (excluding self).
+
+Authorization
+- RBAC: Admin-only endpoints behind role_required("admin") decorator.
+- Session Validation: All protected routes require a valid Flask-Login user and an active session record.
+
+Account & Transaction Handling
+- Primary Account Creation: On registration system auto-creates initial Account.
+- Fund Transfers: Debit sender; credit recipient; record both sides with proper direction annotation.
+- Transaction History: Paginated/recent listing in dashboard and full ledger view.
+
+Beneficiaries & Convenience
+- Beneficiary CRUD: Save, list and remove recipient accounts unique per user.
+- Shortcut Targeting: Transfers can use stored beneficiaries.
+
+Session & Device Management
+- Active Session Creation: Each login creates an ActiveSession with user agent + IP snapshot.
+- Device Enumeration: User sees all active sessions.
+- Remote Termination: User can terminate any session; current session termination triggers forced logout.
+
+Administrative Operations
+- User Freeze/Reactivate: Ensure at least one admin remains active; cannot freeze self.
+- Secure Temp Password Issue: Generates cryptographically strong temporary password.
+- User Deletion (CLI): Safe guard against deleting last remaining admin.
+
+Security & Observability
+- Login Failure Tracking: Increment counters; store timestamp.
+- MFA Secret Provisioning: Display otpauth URI.
+- Last Login Timestamp: Updated on successful auth.
+- Session Last Seen: Updated per request.
+
+==================================================================
+2. NON-FUNCTIONAL REQUIREMENTS
+==================================================================
+
+Security
+- Strong Password Hashing: Argon2id with automatic rehash when parameters change.
+- MFA Enforcement: All logins and password changes require TOTP.
+- Secret Encryption: TOTP secrets encrypted at rest with Fernet derived from SECRET_KEY (or explicit key).
+- CSRF Protection: Flask-WTF token on every state-changing form.
+- Brute-force Mitigation: Login attempts limited within a window; lock message shown.
+- Session Hardening: HttpOnly, SameSite cookies; server-side session token record; watchdog invalidation.
+- Least Privilege: Role-based admin separation; freeze logic ensures safety.
+- Defense Headers: CSP, X-Frame-Options DENY, NoSniff, Referrer Policy, Permissions Policy.
+
+Reliability
+- Atomic Transaction Recording: Debit/credit operations executed in a single commit; rollback on error.
+- Idempotent Account Number Generation: Loop ensures uniqueness.
+
+Maintainability
+- Modular Separation: config.py, security.py, models.py, forms.py, routes.py, decorators.py.
+- Clear Data Models: Timestamp mixins for audit.
+
+Performance (Given Scope)
+- Lightweight ORM queries; limited dataset; indexes on user email & account numbers.
+
+Auditability
+- Transaction, ActiveSession, Beneficiary persistence for post-event analysis.
+
+Usability
+- Immediate feedback via flash messages.
+- Strong visual differentiation of errors/warnings.
+
+Compliance (Illustrative)
+- Password policy reflecting modern guidelines (length + complexity).
+- MFA mandatory reduces reliance on password strength alone.
+
+==================================================================
+3. SECURITY FEATURES (DETAILED WITH CODE SNIPPETS)
+==================================================================
+
+3.1 Password Policy & Hashing (security.py)
+------------------------------------------
+Argon2id chosen for resistance to GPU cracking & side-channel attacks. Rehash triggers if parameters change.
+
+Snippet:
+```
+ph = PasswordHasher()
+
+def hash_password(password: str, *, enforce_policy: bool = True) -> str:
+    if enforce_policy:
+        validate_password_strength(password)
+    return ph.hash(password)
+
+def verify_password(hash_value: str, password: str) -> bool:
+    try:
+        return ph.verify(hash_value, password)
+    except VerifyMismatchError:
+        return False
+
+def needs_rehash(hash_value: str) -> bool:
+    return ph.check_needs_rehash(hash_value)
+```
+
+Policy enforces length >= 12 + uppercase/lowercase/digit/special character to mitigate credential stuffing success.
+
+3.2 TOTP Secret Generation & Encryption
+--------------------------------------
+Each user receives a TOTP secret encrypted with Fernet using a key derived from SECRET_KEY (defense in depth).
+
+```
+def _derive_key(source: str) -> bytes:
+    digest = hashlib.sha256(source.encode()).digest()
+    return base64.urlsafe_b64encode(digest)
+
+def get_fernet() -> Fernet:
+    return Fernet(_get_or_create_totp_key())
+
+def encrypt_totp_secret(secret: str) -> str:
+    return get_fernet().encrypt(secret.encode()).decode()
+
+def decrypt_totp_secret(token: str) -> Optional[str]:
+    try:
+        return get_fernet().decrypt(token.encode()).decode()
+    except InvalidToken:
+        return None
+```
+
+Login verifies 6-digit code within a time window (valid_window=1) mitigating replay.
+
+```
+def verify_totp(token: str, secret: str) -> bool:
+    if not token or not secret:
+        return False
+    totp = pyotp.TOTP(secret)
+    return totp.verify(token, valid_window=1)
+```
+
+3.3 Brute-force Protection & Lockout (routes.py)
+-----------------------------------------------
+Failed attempts tracked per user; lock enforced inside a time window to slow online guessing.
+
+```
+config = current_app.config
+max_attempts = config["MAX_LOGIN_ATTEMPTS"]
+lock_window = config["ACCOUNT_LOCK_WINDOW"]
+
+if user.failed_attempts and user.last_failed_at:
+    lock_age = datetime.utcnow() - user.last_failed_at
+    if user.failed_attempts >= max_attempts and lock_age < lock_window:
+        flash("Account temporarily locked due to repeated failures.", "danger")
+        return render_template("login.html", form=form)
+    if user.failed_attempts >= max_attempts and lock_age >= lock_window:
+        user.failed_attempts = 0
+        user.last_failed_at = None
+```
+
+Failures update counters atomically:
+```
+def _record_auth_failure(user: User) -> None:
+    user.failed_attempts = (user.failed_attempts or 0) + 1
+    user.last_failed_at = datetime.utcnow()
+    db.session.commit()
+```
+
+3.4 Session Management & Device Termination
+-------------------------------------------
+Each login creates an ActiveSession row with server-generated token. Session validated every request; missing record triggers logout.
+
+```
+@portal_bp.before_app_request
+def refresh_active_session():
+    if not current_user.is_authenticated:
+        return None
+    record = _current_session_record()
+    if not record:
+        session.pop("session_token", None)
+        logout_user()
+        flash("Your session has ended. Please sign in again.", "warning")
+        return redirect(url_for("auth.login"))
+    record.last_seen = datetime.utcnow()
+    db.session.commit()
+```
+
+Active session registration:
+```
+def _register_session(user: User) -> None:
+    user_agent = (request.user_agent.string or "unknown")[:255]
+    ip_address = (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown")[:64]
+    record = ActiveSession(user=user, user_agent=user_agent, ip_address=ip_address)
+    db.session.add(record)
+    db.session.flush()
+    session["session_token"] = record.session_token
+```
+
+Termination ensures future requests are invalidated:
+```
+record.terminate()
+if record.session_token == session.get("session_token"):
+    session.pop("session_token", None)
+    logout_user()
+```
+
+3.5 CSRF Protection (forms.py + Flask-WTF)
+-----------------------------------------
+All forms inherit FlaskForm which injects CSRF token via `form.hidden_tag()`. Prevents cross-site request forgery by requiring a valid per-session token.
+
+```
+class BeneficiaryDeleteForm(FlaskForm):
+    beneficiary_id = HiddenField(validators=[DataRequired()])
+    submit = SubmitField("Remove")
+```
+Template example:
+```
+<form method="post">{{ form.hidden_tag() }} ...</form>
+```
+
+3.6 Role-Based Access Control (decorators.py)
+--------------------------------------------
+Admin-only endpoints enforce role check; non-admin returns HTTP 403 early, reducing attack surface.
+
+```
+def role_required(role: str) -> Callable:
+    def decorator(view: Callable) -> Callable:
+        @wraps(view)
+        @login_required
+        def wrapped(*args, **kwargs):
+            if not current_user.has_role(role):
+                abort(403)
+            return view(*args, **kwargs)
+        return wrapped
+    return decorator
+```
+
+Usage:
+```
+@portal_bp.route("/admin")
+@role_required("admin")
+def admin_panel(): ...
+```
+
+3.7 Security Headers (application factory)
+-----------------------------------------
+Defense-in-depth against XSS, clickjacking, MIME sniffing and referrer leakage.
+
+```
+@app.after_request
+def apply_headers(response):
+    csp = app.config.get("CONTENT_SECURITY_POLICY")
+    if csp:
+        response.headers["Content-Security-Policy"] = csp
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "geolocation=()"
+    return response
+```
+
+3.8 Account Freeze & Admin Safeguards
+-------------------------------------
+Administrators can freeze accounts to respond to suspected compromise while ensuring no lockout of all admins.
+
+```
+if user.role == "admin":
+    active_admins = User.query.filter_by(role="admin", is_active=True).count()
+    if active_admins <= 1:
+        flash("Cannot freeze the last active admin.", "danger")
+        return redirect(url_for("portal.admin_panel"))
+```
+
+3.9 Strong Cookie / Session Settings (config.py)
+-----------------------------------------------
+```
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_SECURE = True  # disabled only in development
+REMEMBER_COOKIE_HTTPONLY = True
+PERMANENT_SESSION_LIFETIME = timedelta(minutes=30)
+```
+Mitigates client-side script access and cross-site leakage.
+
+3.10 MFA-Backed Password Change (routes.py)
+------------------------------------------
+Requires current password + valid TOTP preventing attacker use of a stolen session without second factor.
+
+```
+if not verify_password(current_user.password_hash, form.current_password.data):
+    flash("Current password is incorrect.", "danger")
+else:
+    totp_secret = decrypt_totp_secret(current_user.totp_secret_encrypted)
+    if not totp_secret or not verify_totp(form.totp_code.data, totp_secret):
+        flash("Invalid MFA code.", "danger")
+    else:
+        current_user.password_hash = hash_password(form.new_password.data)
+        db.session.commit()
+```
+
+3.11 Automatic Hash Rehash
+--------------------------
+When Argon2 parameters change, the system rehashes seamlessly to keep stored hashes current.
+```
+if needs_rehash(user.password_hash):
+    user.password_hash = hash_password(form.password.data, enforce_policy=False)
+```
+
+3.12 Transaction Integrity
+--------------------------
+Dual-entry style recording ensures auditability and helps detect tampering.
+```
+Transaction.record(account=account, counterparty_account=target_account.account_number, ... direction="debit")
+Transaction.record(account=target_account, counterparty_account=account.account_number, ... direction="credit")
+```
+
+3.13 Minimal Data Exposure
+--------------------------
+Templates never expose raw TOTP secrets post provisioning; only initial setup screen shows base32 secret & otpauth URI.
+
+3.14 Input Validation
+---------------------
+Forms enforce account number regex & 6-digit TOTP to avoid malformed data injection.
+```
+ACCOUNT_REGEX = r"^[0-9]{6,18}$"
+```
+
+==================================================================
+4. THREAT MITIGATIONS SUMMARY
+==================================================================
+- Credential Stuffing: Strong password policy + lockout + MFA.
+- Brute Force: Failed attempt counters and lock window.
+- Session Hijack: ActiveSession token validation per request + HttpOnly cookies.
+- CSRF: Flask-WTF tokens across all POST forms.
+- Replay (MFA): Short TOTP validity window.
+- Privilege Escalation: RBAC decorator + freeze safeguards.
+- Data Leakage: Encrypted MFA secrets, restrictive CSP, no inline arbitrary scripts.
+- Clickjacking: X-Frame-Options DENY.
+- XSS: CSP + Jinja auto-escaping + no untrusted HTML injection.
+- Weak Audit Trail: Comprehensive timestamps and session/transaction records.
+
+==================================================================
+5. EXTENSIBILITY NOTES
+==================================================================
+Potential future enhancements:
+- Rate limiting per IP (Flask-Limiter) for added brute-force control.
+- Structured logging with correlation IDs for security monitoring.
+- Transition to JWT or opaque tokens for API scenarios.
+- Integration with an AML/transaction risk rules engine.
+
+==================================================================
+END OF DOCUMENT
+==================================================================

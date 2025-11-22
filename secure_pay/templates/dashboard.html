@@ -1,0 +1,161 @@
+{% extends 'base.html' %} {% block title %}Dashboard · Secure Pay{% endblock %}
+{% block content %} {% set txn_count = transactions|length %}
+<section class="card hero-card">
+  <div class="hero-content">
+    <div class="hero-copy">
+      <div class="pill">Today</div>
+      <h1>Welcome back, {{ current_user.full_name or 'valued user' }}!</h1>
+      <p>
+        Track balances, send instant transfers, and keep an eye on every signal
+        in your secure workspace.
+      </p>
+      <div class="hero-actions">
+        <a class="btn primary" href="{{ url_for('portal.transfer') }}"
+          >Start a transfer</a
+        >
+        <a class="ghost-button" href="{{ url_for('portal.beneficiaries') }}"
+          >Favorite contacts</a
+        >
+      </div>
+    </div>
+    <div class="hero-balance">
+      <span>Primary balance</span>
+      {% if account %}
+      <strong>${{ '%.2f'|format(account.balance) }}</strong>
+      <small>Account {{ account.account_number }}</small>
+      {% else %}
+      <strong>Pending setup</strong>
+      <small>No active account assigned yet.</small>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="stat-grid">
+  <article class="stat-card">
+    <p class="label">Transactions logged</p>
+    <p class="kpi">{{ txn_count }}</p>
+    <small>
+      {% if txn_count %} Last activity {{
+      transactions[0].created_at.strftime('%b %d · %H:%M') }} {% else %}
+      Awaiting first movement {% endif %}
+    </small>
+    {% set bar_width = txn_count * 12 %} {% if bar_width > 100 %}{% set
+    bar_width = 100 %}{% endif %}
+    <div class="mini-chart"><span style="width: {{ bar_width }}%"></span></div>
+  </article>
+  <article class="stat-card">
+    <p class="label">Last login</p>
+    <p class="kpi">
+      {% if current_user.last_login_at %} {{
+      current_user.last_login_at.strftime('%b %d · %H:%M') }} {% else %} New
+      session {% endif %}
+    </p>
+    <small>Device monitoring is active.</small>
+  </article>
+  <article class="stat-card">
+    <p class="label">Security posture</p>
+    <p class="kpi">MFA on</p>
+    <small>Every login requires your authenticator code.</small>
+    <div class="mini-chart"><span style="width: 95%"></span></div>
+  </article>
+</section>
+
+{% set goal_amount = 10000 %} {% set balance_value = (account.balance | float)
+if account else 0 %} {% set progress = (balance_value / goal_amount * 100) if
+goal_amount else 0 %} {% if progress > 100 %}{% set progress = 100 %}{% endif %}
+<section class="insight-grid">
+  <article class="stat-card progress-widget">
+    <div class="card-header">
+      <h2>Savings journey</h2>
+      <span class="badge">Goal ${{ "{:,.0f}".format(goal_amount) }}</span>
+    </div>
+    <p>Stay on track with a playful progress pulse.</p>
+    <div class="progress-track">
+      <div
+        class="progress-bar"
+        style="width: {{ progress|round(0, 'floor') }}%"
+      ></div>
+    </div>
+    <p class="widget-note">
+      {{ progress|round(0, 'floor') }}% of your illustrative goal is already
+      secured.
+    </p>
+  </article>
+  <article class="stat-card">
+    <div class="card-header">
+      <h2>Security pulse</h2>
+      <span class="badge live">Live</span>
+    </div>
+    <p>Sessions tracked: {{ current_user.sessions|length }}</p>
+    <p class="widget-note">Terminate devices anytime from the Devices view.</p>
+  </article>
+</section>
+
+<section class="card timeline-card">
+  <div class="card-header">
+    <h2>Activity pulse</h2>
+    <span class="badge live">Live</span>
+  </div>
+  <ol class="timeline">
+    {% for txn in transactions[:4] %}
+    <li class="timeline-item">
+      <span class="timeline-dot"></span>
+      <div class="timeline-detail">
+        <h4>
+          {{ txn.direction|capitalize }} · ${{ '%.2f'|format(txn.amount) }}
+        </h4>
+        <span
+          >{{ txn.created_at.strftime('%b %d · %H:%M') }} · {{
+          txn.counterparty_account }}</span
+        >
+      </div>
+    </li>
+    {% else %}
+    <li class="timeline-item">
+      <span class="timeline-dot"></span>
+      <div class="timeline-detail">
+        <h4>No activity yet</h4>
+        <span
+          >Transfers will appear here as soon as you send or receive
+          funds.</span
+        >
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="card">
+  <div class="card-header">
+    <h2>Ledger view</h2>
+    <a class="ghost-button" href="{{ url_for('portal.transfer') }}"
+      >New transfer</a
+    >
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Direction</th>
+        <th>Counterparty</th>
+        <th>Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for txn in transactions %}
+      <tr>
+        <td>{{ txn.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>{{ txn.direction|capitalize }}</td>
+        <td>{{ txn.counterparty_account }}</td>
+        <td>${{ '%.2f'|format(txn.amount) }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4">No transactions yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

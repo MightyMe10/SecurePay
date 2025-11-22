@@ -1,0 +1,72 @@
+{% extends 'base.html' %} {% block title %}Admin · Secure Pay{% endblock %} {%
+block content %}
+<section class="card">
+  <h1>Users</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Last Login</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>{{ user.email }}</td>
+        <td>{{ user.full_name }}</td>
+        <td>{{ user.role|capitalize }}</td>
+        <td>{{ 'Active' if user.is_active else 'Inactive' }}</td>
+        <td>
+          {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at
+          else '—' }}
+        </td>
+        <td class="stacked-actions">
+          <form
+            method="post"
+            action="{{ url_for('portal.admin_toggle_user', user_id=user.id) }}"
+          >
+            {{ freeze_form.csrf_token }} {{ freeze_form.user_id(value=user.id)
+            }} {% set label = 'Freeze' if user.is_active else 'Unfreeze' %}
+            <button class="btn warning small" type="submit">{{ label }}</button>
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('portal.admin_reset_user_password', user_id=user.id) }}"
+          >
+            {{ reset_form.csrf_token }} {{ reset_form.user_id(value=user.id) }}
+            <button class="btn secondary small" type="submit">
+              Reset Password
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>Accounts</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Account</th>
+        <th>Owner</th>
+        <th>Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for account in accounts %}
+      <tr>
+        <td>{{ account.account_number }}</td>
+        <td>{{ account.owner.email }}</td>
+        <td>${{ '%.2f'|format(account.balance) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,41 @@
+# Python environments
+.venv/
+venv/
+env/
+
+# Python cache / compiled
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Application instance data
+instance/
+secure_pay.db
+*.sqlite
+
+# Environment variables / secrets
+.env
+.env.*
+
+# Logs and reports
+logs/
+*.log
+coverage/
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Tooling caches
+.mypy_cache/
+.pytest_cache/
+
+# IDE / editor settings
+.vscode/
+.idea/
+
+# Project-specific directories
+.github/

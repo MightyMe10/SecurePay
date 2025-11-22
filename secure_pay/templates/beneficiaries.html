@@ -1,0 +1,56 @@
+{% extends 'base.html' %} {% block title %}Beneficiaries · Secure Pay{% endblock
+%} {% block content %}
+<section class="card">
+  <h1>Manage Beneficiaries</h1>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <label>{{ form.nickname.label }} {{ form.nickname(class='input') }}</label>
+    {% for error in form.nickname.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %}
+
+    <label
+      >{{ form.account_number.label }} {{ form.account_number(class='input')
+      }}</label
+    >
+    {% for error in form.account_number.errors %}
+    <p class="error">{{ error }}</p>
+    {% endfor %} {{ form.submit(class='btn primary') }}
+  </form>
+</section>
+
+<section class="card">
+  <h2>Saved Recipients</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Account</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in beneficiaries %}
+      <tr>
+        <td>{{ b.nickname }}</td>
+        <td>{{ b.account_number }}</td>
+        <td>
+          <form
+            method="post"
+            action="{{ url_for('portal.delete_beneficiary', beneficiary_id=b.id) }}"
+          >
+            {{ delete_form.csrf_token }} {{
+            delete_form.beneficiary_id(value=b.id) }} {{
+            delete_form.submit(class='btn danger small') }}
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="3">No saved beneficiaries yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends 'base.html' %} {% block title %}MFA Setup · Secure Pay{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Enable MFA</h1>
+  <p>
+    Scan this secret into your authenticator app or use the provisioning URI
+    below.
+  </p>
+  <div class="secret-box">{{ secret }}</div>
+  <p class="muted">URI: {{ provisioning_uri }}</p>
+  <p>Once configured, return to the login page to sign in.</p>
+  <a class="btn" href="{{ url_for('auth.login') }}">Go to Login</a>
+</section>
+{% endblock %}
