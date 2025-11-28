@@ -19,6 +19,15 @@ from .security import (
 )
 
 
+def _prompt_for_password() -> str:
+    while True:
+        password = getpass("Password: ")
+        try:
+            return hash_password(password)
+        except PasswordPolicyError as exc:
+            click.echo(f"Password rejected: {exc}")
+
+
 def create_app(config_name: str | None = None) -> Flask:
     app = Flask(__name__, instance_relative_config=False)
     config_class = get_config(config_name or os.getenv("FLASK_ENV"))
@@ -76,13 +85,7 @@ def register_cli(app: Flask) -> None:
         email = input("Admin email: ").strip().lower()
         full_name = input("Full name: ").strip()
 
-        while True:
-            password = getpass("Password: ")
-            try:
-                password_hash = hash_password(password)
-                break
-            except PasswordPolicyError as exc:
-                click.echo(f"Password rejected: {exc}")
+        password_hash = _prompt_for_password()
 
         with app.app_context():
             secret = generate_totp_secret()

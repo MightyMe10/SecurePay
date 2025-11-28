@@ -4,15 +4,12 @@
   <h1>Manage Beneficiaries</h1>
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
-    <label>{{ form.nickname.label }} {{ form.nickname(class='input') }}</label>
+    {{ form.nickname.label }} {{ form.nickname(class='input') }}
     {% for error in form.nickname.errors %}
     <p class="error">{{ error }}</p>
     {% endfor %}
 
-    <label
-      >{{ form.account_number.label }} {{ form.account_number(class='input')
-      }}</label
-    >
+    {{ form.account_number.label }} {{ form.account_number(class='input') }}
     {% for error in form.account_number.errors %}
     <p class="error">{{ error }}</p>
     {% endfor %} {{ form.submit(class='btn primary') }}

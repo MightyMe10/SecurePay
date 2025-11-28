@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import List
 
@@ -38,6 +38,16 @@ from .security import (
 
 auth_bp = Blueprint("auth", __name__)
 portal_bp = Blueprint("portal", __name__)
+
+
+ROUTE_LOGIN = "auth.login"
+ROUTE_DASHBOARD = "portal.dashboard"
+ROUTE_BENEFICIARIES = "portal.beneficiaries"
+ROUTE_ADMIN = "portal.admin_panel"
+ROUTE_DEVICES = "portal.devices"
+
+TEMPLATE_LOGIN = "login.html"
+TEMPLATE_TRANSFER = "transfer.html"
 
 
 def _primary_account() -> Account | None:
@@ -75,7 +85,7 @@ def _generate_temp_password(length: int = 16) -> str:
 
 def _record_auth_failure(user: User) -> None:
     user.failed_attempts = (user.failed_attempts or 0) + 1
-    user.last_failed_at = datetime.utcnow()
+    user.last_failed_at = datetime.now(timezone.utc)
     db.session.commit()
 
 
@@ -88,8 +98,8 @@ def refresh_active_session():
         session.pop("session_token", None)
         logout_user()
         flash("Your session has ended. Please sign in again.", "warning")
-        return redirect(url_for("auth.login"))
-    record.last_seen = datetime.utcnow()
+        return redirect(url_for(ROUTE_LOGIN))
+    record.last_seen = datetime.now(timezone.utc)
     db.session.commit()
     return None
 
@@ -97,7 +107,7 @@ def refresh_active_session():
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for("portal.dashboard"))
+        return redirect(url_for(ROUTE_DASHBOARD))
     form = RegistrationForm()
     if form.validate_on_submit():
         secret = generate_totp_secret()
@@ -127,54 +137,36 @@ def register():
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for("portal.dashboard"))
+        return redirect(url_for(ROUTE_DASHBOARD))
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data.lower()).first()
         if not user:
             flash("Invalid credentials.", "danger")
-            return render_template("login.html", form=form)
+            return render_template(TEMPLATE_LOGIN, form=form)
         if not user.is_active:
             flash("Account is frozen. Contact support.", "danger")
-            return render_template("login.html", form=form)
+            return render_template(TEMPLATE_LOGIN, form=form)
 
-        config = current_app.config
-        max_attempts = config["MAX_LOGIN_ATTEMPTS"]
-        lock_window = config["ACCOUNT_LOCK_WINDOW"]
+        if _is_account_locked(user):
+            return render_template(TEMPLATE_LOGIN, form=form)
 
-        if user.failed_attempts and user.last_failed_at:
-            lock_age = datetime.utcnow() - user.last_failed_at
-            if user.failed_attempts >= max_attempts and lock_age < lock_window:
-                flash("Account temporarily locked due to repeated failures.", "danger")
-                return render_template("login.html", form=form)
-            if user.failed_attempts >= max_attempts and lock_age >= lock_window:
-                user.failed_attempts = 0
-                user.last_failed_at = None
-
-        if not verify_password(user.password_hash, form.password.data):
-            _record_auth_failure(user)
-            flash("Invalid credentials.", "danger")
-            return render_template("login.html", form=form)
-
-        totp_secret = decrypt_totp_secret(user.totp_secret_encrypted)
-        if not totp_secret or not verify_totp(form.totp_code.data, totp_secret):
-            _record_auth_failure(user)
-            flash("Invalid MFA token.", "danger")
-            return render_template("login.html", form=form)
+        if not _verify_credentials_and_mfa(user, form):
+            return render_template(TEMPLATE_LOGIN, form=form)
 
         if needs_rehash(user.password_hash):
             user.password_hash = hash_password(form.password.data, enforce_policy=False)
 
         user.failed_attempts = 0
         user.last_failed_at = None
-        user.last_login_at = datetime.utcnow()
+        user.last_login_at = datetime.now(timezone.utc)
 
         login_user(user, remember=form.remember_me.data, duration=config["PERMANENT_SESSION_LIFETIME"])
         _register_session(user)
         db.session.commit()
         flash("Logged in securely.", "success")
-        return redirect(url_for("portal.dashboard"))
-    return render_template("login.html", form=form)
+        return redirect(url_for(ROUTE_DASHBOARD))
+    return render_template(TEMPLATE_LOGIN, form=form)
 
 
 @auth_bp.route("/logout")
@@ -187,13 +179,13 @@ def logout():
     session.pop("session_token", None)
     logout_user()
     flash("You have been signed out.", "info")
-    return redirect(url_for("auth.login"))
+    return redirect(url_for(ROUTE_LOGIN))
 
 
 @portal_bp.route("/")
 @login_required
 def root():
-    return redirect(url_for("portal.dashboard"))
+    return redirect(url_for(ROUTE_DASHBOARD))
 
 
 @portal_bp.route("/dashboard")
@@ -217,7 +209,7 @@ def transfer():
     account = _primary_account()
     if not account:
         flash("No active account assigned.", "warning")
-        return redirect(url_for("portal.dashboard"))
+        return redirect(url_for(ROUTE_DASHBOARD))
     form = TransferForm()
     saved_beneficiaries = Beneficiary.query.filter_by(user_id=current_user.id).order_by(Beneficiary.nickname).all()
     if form.validate_on_submit():
@@ -226,12 +218,12 @@ def transfer():
         if not target_account:
             flash("Recipient account not found.", "warning")
             return render_template(
-                "transfer.html", form=form, account=account, beneficiaries=saved_beneficiaries
+                TEMPLATE_TRANSFER, form=form, account=account, beneficiaries=saved_beneficiaries
             )
         if target_account.id == account.id:
             flash("Cannot transfer to the same account.", "warning")
             return render_template(
-                "transfer.html", form=form, account=account, beneficiaries=saved_beneficiaries
+                TEMPLATE_TRANSFER, form=form, account=account, beneficiaries=saved_beneficiaries
             )
         try:
             account.debit(amount)
@@ -257,8 +249,8 @@ def transfer():
             flash(str(exc), "danger")
         else:
             flash("Transfer completed.", "success")
-            return redirect(url_for("portal.dashboard"))
-    return render_template("transfer.html", form=form, account=account, beneficiaries=saved_beneficiaries)
+            return redirect(url_for(ROUTE_DASHBOARD))
+    return render_template(TEMPLATE_TRANSFER, form=form, account=account, beneficiaries=saved_beneficiaries)
 
 
 @portal_bp.route("/transactions")
@@ -267,7 +259,7 @@ def transactions():
     account = _primary_account()
     if not account:
         flash("No active account assigned.", "warning")
-        return redirect(url_for("portal.dashboard"))
+        return redirect(url_for(ROUTE_DASHBOARD))
     history = (
         Transaction.query.filter_by(account_id=account.id)
         .order_by(Transaction.created_at.desc())
@@ -301,7 +293,7 @@ def beneficiaries():
             db.session.add(entry)
             db.session.commit()
             flash("Beneficiary saved.", "success")
-            return redirect(url_for("portal.beneficiaries"))
+            return redirect(url_for(ROUTE_BENEFICIARIES))
     return render_template(
         "beneficiaries.html",
         form=form,
@@ -316,15 +308,15 @@ def delete_beneficiary(beneficiary_id: int):
     form = BeneficiaryDeleteForm()
     if not form.validate_on_submit() or int(form.beneficiary_id.data) != beneficiary_id:
         flash("Invalid request.", "danger")
-        return redirect(url_for("portal.beneficiaries"))
+        return redirect(url_for(ROUTE_BENEFICIARIES))
     entry = Beneficiary.query.filter_by(id=beneficiary_id, user_id=current_user.id).first()
     if not entry:
         flash("Beneficiary not found.", "warning")
-        return redirect(url_for("portal.beneficiaries"))
+        return redirect(url_for(ROUTE_BENEFICIARIES))
     db.session.delete(entry)
     db.session.commit()
     flash("Beneficiary removed.", "info")
-    return redirect(url_for("portal.beneficiaries"))
+    return redirect(url_for(ROUTE_BENEFICIARIES))
 
 
 @portal_bp.route("/devices", methods=["GET", "POST"])
@@ -342,16 +334,16 @@ def devices():
         ).first()
         if not record:
             flash("Session not found.", "warning")
-            return redirect(url_for("portal.devices"))
+            return redirect(url_for(ROUTE_DEVICES))
         record.terminate()
         db.session.commit()
         if record.session_token == session.get("session_token"):
             session.pop("session_token", None)
             logout_user()
             flash("Current session terminated. Please log in again.", "info")
-            return redirect(url_for("auth.login"))
+            return redirect(url_for(ROUTE_LOGIN))
         flash("Device session logged out.", "success")
-        return redirect(url_for("portal.devices"))
+        return redirect(url_for(ROUTE_DEVICES))
     return render_template("devices.html", sessions=sessions_list, form=form)
 
 
@@ -370,7 +362,7 @@ def password_settings():
                 current_user.password_hash = hash_password(form.new_password.data)
                 db.session.commit()
                 flash("Password updated securely.", "success")
-                return redirect(url_for("portal.dashboard"))
+                return redirect(url_for(ROUTE_DASHBOARD))
     return render_template("password_reset.html", form=form)
 
 
@@ -399,13 +391,13 @@ def admin_toggle_user(user_id: int):
     user = User.query.get_or_404(user_id)
     if user.id == current_user.id:
         flash("You cannot change your own status.", "warning")
-        return redirect(url_for("portal.admin_panel"))
+        return redirect(url_for(ROUTE_ADMIN))
     if user.is_active:
         if user.role == "admin":
             active_admins = User.query.filter_by(role="admin", is_active=True).count()
             if active_admins <= 1:
                 flash("Cannot freeze the last active admin.", "danger")
-                return redirect(url_for("portal.admin_panel"))
+                return redirect(url_for(ROUTE_ADMIN))
         user.is_active = False
         message = "User frozen."
     else:
@@ -413,7 +405,7 @@ def admin_toggle_user(user_id: int):
         message = "User reactivated."
     db.session.commit()
     flash(message, "info")
-    return redirect(url_for("portal.admin_panel"))
+    return redirect(url_for(ROUTE_ADMIN))
 
 
 @portal_bp.route("/admin/users/<int:user_id>/reset-password", methods=["POST"])
@@ -430,4 +422,4 @@ def admin_reset_user_password(user_id: int):
         f"Temporary password for {user.email}: {temp_password}. Share securely and require immediate reset.",
         "info",
     )
-    return redirect(url_for("portal.admin_panel"))
+    return redirect(url_for(ROUTE_ADMIN))

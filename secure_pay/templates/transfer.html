@@ -7,22 +7,17 @@ endblock %} {% block content %}
   </p>
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
-    <label
-      >{{ form.target_account.label }} {{ form.target_account(class='input')
-      }}</label
-    >
+    {{ form.target_account.label }} {{ form.target_account(class='input') }}
     {% for error in form.target_account.errors %}
     <p class="error">{{ error }}</p>
     {% endfor %}
 
-    <label>{{ form.amount.label }} {{ form.amount(class='input') }}</label>
+    {{ form.amount.label }} {{ form.amount(class='input') }}
     {% for error in form.amount.errors %}
     <p class="error">{{ error }}</p>
     {% endfor %}
 
-    <label
-      >{{ form.description.label }} {{ form.description(class='input') }}</label
-    >
+    {{ form.description.label }} {{ form.description(class='input') }}
     {% for error in form.description.errors %}
     <p class="error">{{ error }}</p>
     {% endfor %} {{ form.submit(class='btn primary') }}

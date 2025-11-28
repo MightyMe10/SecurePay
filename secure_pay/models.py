@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -12,8 +12,11 @@ from .extensions import db
 
 
 class TimestampMixin:
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+USER_ID_FK = "user.id"
 
 
 class User(UserMixin, TimestampMixin, db.Model):
@@ -40,7 +43,7 @@ class Account(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     account_number = db.Column(db.String(20), unique=True, nullable=False, index=True)
     balance = db.Column(db.Numeric(14, 2), default=Decimal("0.00"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey(USER_ID_FK), nullable=False)
 
     outgoing_transactions = db.relationship(
         "Transaction",
@@ -102,7 +105,7 @@ class Beneficiary(TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nickname = db.Column(db.String(120), nullable=False)
     account_number = db.Column(db.String(20), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey(USER_ID_FK), nullable=False)
 
     __table_args__ = (db.UniqueConstraint("user_id", "account_number", name="uq_user_beneficiary"),)
 
@@ -113,12 +116,12 @@ class ActiveSession(TimestampMixin, db.Model):
     user_agent = db.Column(db.String(255))
     ip_address = db.Column(db.String(64))
     is_active = db.Column(db.Boolean, default=True)
-    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    last_seen = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     ended_at = db.Column(db.DateTime)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey(USER_ID_FK), nullable=False)
 
     def terminate(self) -> None:
         self.is_active = False
-        timestamp = datetime.utcnow()
+        timestamp = datetime.now(timezone.utc)
         self.ended_at = timestamp
         self.last_seen = timestamp

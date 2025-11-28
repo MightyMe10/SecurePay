@@ -289,13 +289,13 @@ button:active,
 
 .btn-warning, .btn.warning {
   background: linear-gradient(135deg, var(--warning), #d97706);
-  color: white;
+  color: #000000;
   box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.3);
 }
 
 .btn.freeze {
   background: linear-gradient(135deg, #06b6d4, #0891b2);
-  color: white;
+  color: #000000;
   box-shadow: 0 4px 6px -1px rgba(6, 182, 212, 0.3);
 }
 
@@ -597,7 +597,7 @@ tr:last-child td {
   align-items: center;
   justify-content: center;
   color: white;
-  background: rgba(255, 255, 255, 0.1);
+  background: #26334d; /* Solid color equivalent to rgba(255, 255, 255, 0.1) on #0f172a */
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
   font-size: 0.875rem;
@@ -606,7 +606,7 @@ tr:last-child td {
 }
 
 .ghost-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #3e4960; /* Solid color equivalent to rgba(255, 255, 255, 0.2) on #0f172a */
   color: white;
 }
 
