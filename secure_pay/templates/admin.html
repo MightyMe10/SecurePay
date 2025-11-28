@@ -31,7 +31,7 @@ block content %}
           >
             {{ freeze_form.csrf_token }} {{ freeze_form.user_id(value=user.id)
             }} {% set label = 'Freeze' if user.is_active else 'Unfreeze' %}
-            <button class="btn warning small" type="submit">{{ label }}</button>
+            <button class="btn freeze small" type="submit">{{ label }}</button>
           </form>
           <form
             method="post"
