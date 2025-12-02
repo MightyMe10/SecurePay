@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import secrets
 import string
-from datetime import datetime, timezone
+import bleach
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List
 
@@ -89,16 +90,65 @@ def _record_auth_failure(user: User) -> None:
     db.session.commit()
 
 
+def _is_account_locked(user: User) -> bool:
+    if user.failed_attempts >= current_app.config["MAX_LOGIN_ATTEMPTS"]:
+        if (
+            user.last_failed_at
+            and datetime.now(timezone.utc) - user.last_failed_at < current_app.config["ACCOUNT_LOCK_WINDOW"]
+        ):
+            flash("Account locked due to too many failed attempts. Please try again later.", "danger")
+            return True
+    return False
+
+
+def _verify_credentials_and_mfa(user: User, form: LoginForm) -> bool:
+    if not verify_password(user.password_hash, form.password.data):
+        _record_auth_failure(user)
+        flash("Invalid credentials.", "danger")
+        return False
+
+    totp_secret = decrypt_totp_secret(user.totp_secret_encrypted)
+    if not totp_secret or not verify_totp(form.totp_code.data, totp_secret):
+        _record_auth_failure(user)
+        flash("Invalid MFA token.", "danger")
+        return False
+    return True
+
+
 @portal_bp.before_app_request
 def refresh_active_session():
     if not current_user.is_authenticated:
         return None
+
+    # Lazy Cleanup: Terminate all expired sessions
+    # This ensures that stale sessions are cleaned up even if those users don't log in
+    try:
+        session_timeout = current_app.config["PERMANENT_SESSION_LIFETIME"]
+        now = datetime.now(timezone.utc)
+        cutoff = now - session_timeout
+        
+        # Find all active sessions that are older than the cutoff
+        expired_sessions = ActiveSession.query.filter(
+            ActiveSession.is_active == True,
+            ActiveSession.last_seen < cutoff
+        ).all()
+        
+        if expired_sessions:
+            for s in expired_sessions:
+                s.terminate()
+            db.session.commit()
+    except Exception:
+        # Don't block the request if cleanup fails
+        db.session.rollback()
+
+    # Validate Current Session
     record = _current_session_record()
     if not record:
         session.pop("session_token", None)
         logout_user()
-        flash("Your session has ended. Please sign in again.", "warning")
+        flash("Your session has expired due to inactivity.", "warning")
         return redirect(url_for(ROUTE_LOGIN))
+
     record.last_seen = datetime.now(timezone.utc)
     db.session.commit()
     return None
@@ -115,7 +165,7 @@ def register():
         try:
             user = User(
                 email=form.email.data.lower(),
-                full_name=form.full_name.data.strip(),
+                full_name=bleach.clean(form.full_name.data.strip()),
                 password_hash=hash_password(form.password.data),
                 totp_secret_encrypted=encrypted_secret,
             )
@@ -161,7 +211,7 @@ def login():
         user.last_failed_at = None
         user.last_login_at = datetime.now(timezone.utc)
 
-        login_user(user, remember=form.remember_me.data, duration=config["PERMANENT_SESSION_LIFETIME"])
+        login_user(user, remember=False, duration=current_app.config["PERMANENT_SESSION_LIFETIME"])
         _register_session(user)
         db.session.commit()
         flash("Logged in securely.", "success")
@@ -228,7 +278,7 @@ def transfer():
         try:
             account.debit(amount)
             target_account.credit(amount)
-            description = (form.description.data or "").strip()
+            description = bleach.clean((form.description.data or "").strip())
             Transaction.record(
                 account=account,
                 counterparty_account=target_account.account_number,
@@ -287,7 +337,7 @@ def beneficiaries():
         else:
             entry = Beneficiary(
                 owner=current_user,
-                nickname=form.nickname.data.strip(),
+                nickname=bleach.clean(form.nickname.data.strip()),
                 account_number=form.account_number.data,
             )
             db.session.add(entry)

@@ -325,8 +325,14 @@ button:active,
 }
 
 .flash.success { border-color: var(--success); background: rgba(16, 185, 129, 0.1); }
-.flash.error { border-color: var(--error); background: rgba(239, 68, 68, 0.1); }
+.flash.error, .flash.danger { border-color: var(--error); background: rgba(239, 68, 68, 0.1); }
 .flash.warning { border-color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+
+.error {
+  color: var(--error);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
 
 /* Footer */
 footer {
@@ -526,6 +532,10 @@ footer {
 }
 
 /* Timeline */
+.timeline-card {
+  margin-bottom: var(--spacing-lg);
+}
+
 .timeline {
   list-style: none;
   position: relative;

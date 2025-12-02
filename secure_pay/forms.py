@@ -38,7 +38,6 @@ class LoginForm(FlaskForm):
         "Authenticator Code",
         validators=[DataRequired(), Length(min=6, max=6), Regexp(r"^\d{6}$", message="Enter the 6-digit code.")],
     )
-    remember_me = BooleanField("Remember Me")
     submit = SubmitField("Sign In")
 
 

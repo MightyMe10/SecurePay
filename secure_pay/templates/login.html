@@ -20,11 +20,8 @@ block content %}
     {% endfor %}
 
     <div class="checkbox">
-      {{ form.remember_me() }}
-      <label for="{{ form.remember_me.id }}">{{ form.remember_me.label.text }}</label>
+      {{ form.submit(class="btn primary full-width") }}
     </div>
-
-    {{ form.submit(class='btn primary') }}
   </form>
 </section>
 {% endblock %}
